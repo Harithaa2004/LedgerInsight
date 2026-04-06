@@ -1,30 +1,29 @@
 const db = require("../config/db");
 
 // Check if email exists
-const findUserByEmail = (email, callback) => {
-  const query = "SELECT id FROM users WHERE email = ?";
-  db.query(query, [email], callback);
+const findUserByEmail = async (email) => {
+  const [rows] = await db.query(
+    "SELECT id FROM users WHERE email = ?",
+    [email]
+  );
+  return rows;
 };
 
-// Create user
-const createUser = (userData, callback) => {
-  const { name, email, role, isActive } = userData;
-
-  const query =
-    "INSERT INTO users (name, email, role, isActive) VALUES (?, ?, ?, ?)";
-
-  db.query(query, [name, email, role, isActive], callback);
+const createUser = async ({ name, email, role, isActive }) => {
+  const [result] = await db.query(
+    "INSERT INTO users (name, email, role, isActive) VALUES (?, ?, ?, ?)",
+    [name, email, role, isActive]
+  );
+  return result;
 };
 
-// Get all active users
-const getAllUsers = (callback) => {
-  const query = `
+const getAllUsers = async () => {
+  const [rows] = await db.query(`
     SELECT id, name, email, role, isActive, createdAt, updatedAt
     FROM users
     WHERE isActive = true
-  `;
-
-  db.query(query, callback);
+  `);
+  return rows;
 };
 
 module.exports = {

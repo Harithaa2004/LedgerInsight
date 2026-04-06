@@ -5,7 +5,7 @@ const createRecord = async (req, res) => {
   try {
     let { amount, type, category, date, notes } = req.body;
 
-    // ✅ Validation
+    //Validation
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: "Amount must be > 0" });
     }
@@ -22,13 +22,13 @@ const createRecord = async (req, res) => {
       return res.status(400).json({ error: "Date required" });
     }
 
-    // ✅ Normalize category
+    //Normalize category
     category = category.toLowerCase();
 
-    // ✅ Backend-controlled fields
+    //Backend-controlled fields
     const userId = req.user.id;
     const isDeleted = false;
-    // 💡 Check balance only for expense
+    //Check balance only for expense
 if (type === "expense") {
   const [balanceResult] = await db.query(`
     SELECT 
@@ -73,17 +73,14 @@ if (type === "expense") {
   }
 };
 
-// GET RECORDS (basic for now)
+// GET RECORDS
 const getRecords = async (req, res) => {
   try {
-    // 1️⃣ Get filters from query params
     const { type, category, startDate, endDate } = req.query;
 
-    // 2️⃣ Base query
-    let query = "SELECT * FROM financial_records WHERE isDeleted = false";
-    let values = [];
-
-    // 3️⃣ Apply filters dynamically
+    // user-specific data
+    let query = "SELECT * FROM financial_records WHERE isDeleted = false AND userId = ?";
+    let values = [req.user.id];
 
     if (type) {
       query += " AND type = ?";
@@ -100,10 +97,8 @@ const getRecords = async (req, res) => {
       values.push(startDate, endDate);
     }
 
-    // 4️⃣ Execute query
     const [results] = await db.query(query, values);
 
-    // 5️⃣ Return response
     return res.json(results);
 
   } catch (error) {
@@ -114,13 +109,18 @@ const getRecords = async (req, res) => {
 const deleteRecord = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
 
     const [result] = await db.query(
-      "UPDATE financial_records SET isDeleted = true WHERE id = ?",
-      [id]
+      "UPDATE financial_records SET isDeleted = true WHERE id = ? AND userId = ?",
+      [id, userId]
     );
 
-    return res.json({ message: "Record deleted" });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Record not found" });
+    }
+
+    return res.json({ message: "Record deleted successfully" });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -133,7 +133,7 @@ const updateRecord = async (req, res) => {
     let { amount, type, category, date, notes } = req.body;
     const userId = req.user.id;
 
-    // console.log(`🔍 Update Request: ID=${id}, UserId=${userId}, Body:`, req.body);
+    // console.log(`Update Request: ID=${id}, UserId=${userId}, Body:`, req.body);
 
     // Validation
     if (!amount || amount <= 0) {
@@ -144,7 +144,7 @@ const updateRecord = async (req, res) => {
       return res.status(400).json({ error: "Invalid type" });
     }
 
-    // 💡 Balance check if expense
+    // Balance check if expense
     if (type === "expense") {
       const [balanceResult] = await db.query(`
         SELECT 
@@ -169,13 +169,13 @@ const updateRecord = async (req, res) => {
       [amount, type, category, date, notes, id, userId]
     );
 
-    // console.log(`📝 Update Result: affectedRows=${result.affectedRows}, ID=${id}, UserId=${userId}`);
+    // console.log(` Update Result: affectedRows=${result.affectedRows}, ID=${id}, UserId=${userId}`);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Record not found" });
     }
 
-    return res.json({ message: "UPDATED HIT SUCCESS" });
+    return res.json({ message: "Record updated successfully" });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });

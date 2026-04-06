@@ -2,43 +2,62 @@ const db = require("../config/db");
 
 const getDashboard = async (req, res) => {
   try {
-    // 1️⃣ Total Income
+    const userId = req.user.id;
+
+    // Total Income (user-specific)
     const [incomeResult] = await db.query(
       `SELECT IFNULL(SUM(amount), 0) AS totalIncome 
        FROM financial_records 
-       WHERE type = 'income' AND isDeleted = false`
+       WHERE type = 'income' AND isDeleted = false AND userId = ?`,
+      [userId]
     );
 
-    // 2️⃣ Total Expense
     const [expenseResult] = await db.query(
       `SELECT IFNULL(SUM(amount), 0) AS totalExpense 
        FROM financial_records 
-       WHERE type = 'expense' AND isDeleted = false`
+       WHERE type = 'expense' AND isDeleted = false AND userId = ?`,
+      [userId]
     );
 
-    // 3️⃣ Category-wise totals
+    const totalIncome = incomeResult[0].totalIncome;
+    const totalExpense = expenseResult[0].totalExpense;
+    const netBalance = totalIncome - totalExpense;
+
+    // Viewer: only summary
+    if (req.user.role === 2) {
+      return res.json({
+        totalIncome,
+        totalExpense,
+        netBalance
+      });
+    }
+
+    // Category-wise totals (Analyst/Admin)
     const [categoryTotals] = await db.query(
       `SELECT category, SUM(amount) AS total 
        FROM financial_records 
-       WHERE isDeleted = false
-       GROUP BY category`
+       WHERE isDeleted = false AND userId = ?
+       GROUP BY category`,
+      [userId]
     );
 
-    // 4️⃣ Monthly trends
+    // Monthly trends (Analyst/Admin)
     const [monthlyTrends] = await db.query(
       `SELECT 
          DATE_FORMAT(date, '%Y-%m') AS month,
          SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income,
          SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense
        FROM financial_records
-       WHERE isDeleted = false
+       WHERE isDeleted = false AND userId = ?
        GROUP BY month
-       ORDER BY month ASC`
+       ORDER BY month ASC`,
+      [userId]
     );
 
     return res.json({
-      totalIncome: incomeResult[0].totalIncome,
-      totalExpense: expenseResult[0].totalExpense,
+      totalIncome,
+      totalExpense,
+      netBalance,
       categoryTotals,
       monthlyTrends
     });
@@ -51,5 +70,3 @@ const getDashboard = async (req, res) => {
 module.exports = {
   getDashboard,
 };
-
-module.exports = { getDashboard };
